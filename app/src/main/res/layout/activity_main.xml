@@ -10,18 +10,18 @@
     tools:context=".MainActivity">
 
     <TextView
-        android:id="@+id/money_tv"
+        android:id="@+id/moneyTv"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Money: 0"
         android:textSize="30sp" />
 
     <Button
-        android:id="@+id/buy_btn"
+        android:id="@+id/buyBtn"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16sp"
-        tools:text="START RANDOM TASK" />
+        android:text="START RANDOM TASK" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -37,13 +37,13 @@
             android:textStyle="bold" />
 
         <LinearLayout
-            android:id="@+id/current_product_vll"
+            android:id="@+id/currentProductVll"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical">
 
             <LinearLayout
-                android:id="@+id/current_product_hll"
+                android:id="@+id/currentProductHll"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:descendantFocusability="blocksDescendants"
@@ -66,14 +66,14 @@
         android:textStyle="bold" />
 
     <ScrollView
-        android:id="@+id/game_log_sv"
+        android:id="@+id/gameLogSv"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fillViewport="true"
         android:scrollbarSize="16sp">
 
         <LinearLayout
-            android:id="@+id/game_log_vll"
+            android:id="@+id/gameLogVll"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical" />
