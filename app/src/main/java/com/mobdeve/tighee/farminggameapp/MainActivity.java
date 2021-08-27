@@ -1,13 +1,9 @@
 package com.mobdeve.tighee.farminggameapp;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.work.OneTimeWorkRequest;
 
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
@@ -37,12 +33,8 @@ public class MainActivity extends AppCompatActivity {
     private int money;
     private int jobCount;
 
-    private boolean registeredReceiver = false;
-
-    private BroadcastReceiver myReceiver;
-    private IntentFilter myFilter;
-
     private ExecutorService executorService;
+    private Handler handler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,6 +42,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         this.executorService = Executors.newSingleThreadExecutor();
+        this.handler = new Handler();
 
         this.moneyTv = findViewById(R.id.moneyTv);
         this.buyBtn = findViewById(R.id.buyBtn);
@@ -70,8 +63,13 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
                 if(money >= 10) {
                     updateMoney(-10);
-                    executorService.execute(new ProductionRunnable(jobCount, MainActivity.this));
+
+                    ProductionRunnable productionRunnable = new ProductionRunnable(jobCount);
+                    executorService.execute(productionRunnable);
+
                     addToGameLog(jobCount, "Production task queued.");
+                    scrollToBottom();
+
                     jobCount++;
                 } else {
                     Toast.makeText(
@@ -81,36 +79,13 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
-
-        this.myReceiver = new MyBroadcastReceiver();
-        this.myFilter = new IntentFilter();
-        this.myFilter.addAction(Constants.START_INTENT_ACTION);
-        this.myFilter.addAction(Constants.PROGRESS_INTENT_ACTION);
-        this.myFilter.addAction(Constants.FINISH_INTENT_ACTION);
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-        if(!this.registeredReceiver) {
-            registerReceiver(this.myReceiver, this.myFilter);
-            registeredReceiver = true;
-        }
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        if(this.registeredReceiver) {
-            unregisterReceiver(this.myReceiver);
-            this.registeredReceiver = false;
-        }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         Log.d(TAG, "onDestroy: called");
+        this.executorService.shutdownNow();
     }
 
     private void addNoTaskView() {
@@ -144,38 +119,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    public class MyBroadcastReceiver extends BroadcastReceiver {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            Log.d(TAG, "onReceive:");
-
-            int jobCount = intent.getIntExtra(Constants.JOB_ID_KEY, 0);
-            String productName = intent.getStringExtra(Constants.NAME_KEY);
-
-            if(intent.getAction().equals(Constants.START_INTENT_ACTION)) {
-                int imageId = intent.getIntExtra(Constants.IMAGE_KEY, 0);
-                int productionTime = intent.getIntExtra(Constants.TIME_KEY, 0);
-
-                addToGameLog(jobCount, "Work on " + productName + " product started.");
-                addCurrentTaskViews(imageId, productName, productionTime);
-
-                scrollToBottom();
-            } else if(intent.getAction().equals(Constants.FINISH_INTENT_ACTION)) {
-                int generatedMoney = intent.getIntExtra(Constants.MONEY_KEY, 0);
-
-                updateMoney(generatedMoney);
-                addToGameLog(jobCount, "Work on " + productName + " has finished. Generated " + generatedMoney + " money.");
-                removeCurrentTaskViews();
-
-                scrollToBottom();
-            } else if(intent.getAction().equals(Constants.PROGRESS_INTENT_ACTION)) {
-                int currProgress = intent.getIntExtra(Constants.PROGRESS_KEY, 0);
-
-                progressBar.setProgress(currProgress);
-            }
-        }
-    }
-
     private void addCurrentTaskViews(int imageId, String productName, int productionTime) {
         this.currentProductHll.removeAllViews();
 
@@ -205,5 +148,62 @@ public class MainActivity extends AppCompatActivity {
         View v = this.currentProductVll.getChildAt(0);
         this.currentProductVll.removeAllViews();
         this.currentProductVll.addView(v);
+    }
+
+    private class ProductionRunnable implements Runnable {
+        private int taskId;
+
+        public ProductionRunnable(int taskId) {
+            this.taskId = taskId;
+        }
+
+        @Override
+        public void run() {
+            try {
+                Log.d(TAG, "thread: id is" + this.taskId);
+
+                // Randomly create a new product
+                Product product = Product.generateProduct();
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        addToGameLog(taskId, "Work on " + product.getName() + " product started.");
+                        addCurrentTaskViews(product.getImageId(), product.getName(), product.getProductionTime());
+                        scrollToBottom();
+                    }
+                });
+                Log.d(TAG, "thread: created product: " + product.getName());
+
+                // Work on the actual product (i.e. sleep...) + send updates
+                int i;
+                for(i = 0; i < product.getProductionTime() && !Thread.currentThread().isInterrupted(); i++) {
+                    Log.d(TAG, "thread: working on product... " + i);
+                    int ctr = i;
+
+                    Thread.sleep(1000);
+
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            progressBar.setProgress(ctr);
+                        }
+                    });
+                }
+
+                // Production finished
+                int generatedMoney = product.generateMoney();
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        updateMoney(generatedMoney);
+                        addToGameLog(taskId, "Work on " + product.getName() + " has finished. Generated " + generatedMoney + " money.");
+                        removeCurrentTaskViews();
+                    }
+                });
+                Log.d(TAG, "thread: finished.");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }
